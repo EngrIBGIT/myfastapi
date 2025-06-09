@@ -49,13 +49,21 @@ jobs:
           source .venv/bin/activate
           pytest
 
-      # Create archive of dependency files
+      # Create archive of dependency file
       - name: Archive dependencies
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/artifacts
           cd .venv/lib/python3.9/site-packages
-          ls -lah  # Debugging step to ensure files exist
-          zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies.zip ./*
+          
+          # Debugging: List directory contents
+          ls -lah  
+          
+          # Ensure files exist before zipping
+          if [ "$(ls -A .)" ]; then
+            zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies.zip ./*
+          else
+            echo "No files found in site-packages, skipping zip creation."
+          fi
 
       # Add API files to Zip
       - name: Add API files to Zip
