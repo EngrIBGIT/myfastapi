@@ -1,0 +1,66 @@
+name: FastAPI CI/CD
+on:
+  # This workflow is triggered on pushes and pull requests to the main branch
+  push:
+    branches:
+      # Pushes to the main branch will trigger the workflow
+      - main
+
+# The Job defines a series of steps that execute on the same runner.
+jobs:
+
+  CI:
+    # Define the runner used in the workflow
+    runs-on: ubuntu-latest
+    steps:
+      # Checkout the repository
+      - uses: actions/checkout@v2
+
+      # Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: 3.7
+
+
+      # Install Python Virtual ENVironment
+      - name: Install Python Virtual ENV
+        run: pip3 install virtualenv
+
+      # Setup Virtual Environment
+      # https'://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
+      - name: Virtual ENV
+        uses: actions/checkout@v2
+        id: catch-venv
+        with:
+            path: .venv
+
+            key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+            restore-keys: /
+              ${{ runner.os }}-venv-
+
+
+      # Build a virtual environment, But only if it does not already exist
+      - name: Activate Virtual ENV
+        run:  python venv -m venv .venv/bin/activate && pip3 install -r requirements.txt
+        if: steps.catch-venv.outputs.cache-hit != 'true'
+
+      # Run tests
+      - name: Run Tests
+        run: . venv/bin/activate && pytest
+      - name: Create archive of dependency files
+        run:  /
+           cd .venv/lib/python3.7/site-packages && \
+           zip -r9 ${GITHUB_WORKSPACE}/dependencies.zip . && \
+      - name: Add API files to Zip files
+        run:  cd ${GITHUB_WORKSPACE} && \
+           zip -r9 dependencies.zip . && \
+           mv dependencies.zip ${GITHUB_WORKSPACE}/dependencies.zip
+
+
+      # Upload the zip file as an artifact
+      - name: Upload dependencies.zip
+        uses: actions/upload-artifact@v2
+        with:
+          name: dependencies
+          path: ${GITHUB_WORKSPACE}/dependencies.zip
