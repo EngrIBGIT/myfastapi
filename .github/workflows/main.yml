@@ -9,67 +9,117 @@ jobs:
   CI:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      # Checkout the repository
+      - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Set up Python environment
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: "3.9"
 
-      - name: Install Dependencies
+      # Install dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          pip install virtualenv
+
+      # Cache Virtual Environment
+      - name: Cache Virtual Environment
+        uses: actions/cache@v4
+        id: cache-venv
+        with:
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
+
+      # Create and Activate Virtual Environment (if needed)
+      - name: Setup Virtual Environment
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
           pip install -r requirements.txt
 
+      # Run Tests
       - name: Run Tests
         run: |
-          pytest || echo "Tests failed but continuing..."
+          source .venv/bin/activate
+          pytest
 
-      - name: Archive Dependencies and Source
+      # Create archive of dependency file
+      - name: Archive dependencies
         run: |
-          mkdir -p artifacts
-          zip -r artifacts/deployment.zip . -x "*.git*" "artifacts/*"
+          mkdir -p ${GITHUB_WORKSPACE}/artifacts
+          cd .venv/lib/python3.9/site-packages
+          
+          # Debugging: List directory contents
+          ls -lah  
+          
+          # Ensure files exist before zipping
+          if [ "$(ls -A .)" ]; then
+            zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies-${{ github.run_number }}.zip ./*
+          else
+            echo "No files found in site-packages, skipping zip creation."
+          fi
 
-      - name: Upload Artifact
+      # Add API files to Zip
+      - name: Add API files to Zip
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          zip -r artifacts/dependencies-${{ github.run_number }}.zip .
+
+      # Upload the zip file as an artifact (Ensuring correct name match)
+      - name: Upload dependencies.zip
         uses: actions/upload-artifact@v4
         with:
-          name: fastapi-deployment-artifact
-          path: artifacts/deployment.zip
-          retention-days: 5
+          name: dependencies-${{ github.run_number }}  # Unique name per run
+          path: ${GITHUB_WORKSPACE}/artifacts/dependencies-${{ github.run_number }}.zip
+          retention-days: 5  # Prevent expiration issues
 
   CD:
     runs-on: ubuntu-latest
     needs: [CI]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
-      - name: Install AWS CLI
+      # Install AWS CLI (Official Method)
+      - name: Install or Update AWS CLI
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
           unzip awscliv2.zip
-          sudo ./aws/install
+          sudo ./aws/install --update  # Added --update flag
           aws --version
 
-      - name: Download Artifact
+      # Configure AWS credentials
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Download dependencies.zip artifact (Ensuring correct name match)
+      - name: Download dependencies.zip
         uses: actions/download-artifact@v4
         with:
-          name: fastapi-deployment-artifact
+          name: dependencies-${{ github.run_number }}  # Must match exactly with the upload step
           path: artifacts
 
+      # Upload to AWS S3
       - name: Upload to S3
         run: |
-          aws s3 cp artifacts/deployment.zip s3://fastapiride/deployment.zip
+          aws s3 cp artifacts/dependencies-${{ github.run_number }}.zip s3://fastapiride/dependencies-${{ github.run_number }}.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
+      # Deploy to AWS Lambda
       - name: Deploy to AWS Lambda
         run: |
-          aws lambda update-function-code \
-            --function-name fastapi \
-            --s3-bucket fastapiride \
-            --s3-key deployment.zip
+          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key dependencies-${{ github.run_number }}.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          
