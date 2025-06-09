@@ -1,4 +1,5 @@
 name: FastAPI CI/CD
+
 on:
   push:
     branches:
@@ -16,7 +17,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: "3.9"
 
       # Install dependencies
       - name: Install dependencies
@@ -48,7 +49,7 @@ jobs:
           source .venv/bin/activate
           pytest
 
-      # Create archive of dependency files
+      # Create archive of dependency files (Best Practices)
       - name: Archive dependencies
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/artifacts
@@ -67,3 +68,43 @@ jobs:
         with:
           name: dependencies
           path: ${GITHUB_WORKSPACE}/artifacts/dependencies.zip
+
+  CD:
+    runs-on: ubuntu-latest
+    needs: [CI]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      # Install AWS CLI
+      - name: Install AWS CLI
+        uses: unfor19/install-aws-cli-action@v1
+        with:
+          version: 1
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Download dependencies.zip artifact
+      - name: Download dependencies.zip
+        uses: actions/download-artifact@v4
+        with:
+          name: dependencies
+          path: artifacts  # Ensuring correct path
+
+      # Upload to AWS S3
+      - name: Upload to S3
+        run: |
+          aws s3 cp artifacts/dependencies.zip s3://fastapiride/dependencies.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+
+      # Deploy to AWS Lambda (Ensure this step is properly configured)
+      - name: Deploy to AWS Lambda
+        run: |
+          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key dependencies.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
