@@ -60,7 +60,7 @@ jobs:
           
           # Ensure files exist before zipping
           if [ "$(ls -A .)" ]; then
-            zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies.zip ./*
+            zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies-${{ github.run_number }}.zip ./*
           else
             echo "No files found in site-packages, skipping zip creation."
           fi
@@ -69,14 +69,14 @@ jobs:
       - name: Add API files to Zip
         run: |
           cd ${GITHUB_WORKSPACE}
-          zip -r artifacts/dependencies.zip .
+          zip -r artifacts/dependencies-${{ github.run_number }}.zip .
 
       # Upload the zip file as an artifact (Ensuring correct name match)
       - name: Upload dependencies.zip
         uses: actions/upload-artifact@v4
         with:
-          name: dependencies  # Matches the expected artifact name
-          path: ${GITHUB_WORKSPACE}/artifacts/dependencies.zip
+          name: dependencies-${{ github.run_number }}  # Unique name per run
+          path: ${GITHUB_WORKSPACE}/artifacts/dependencies-${{ github.run_number }}.zip
           retention-days: 5  # Prevent expiration issues
 
   CD:
@@ -102,13 +102,13 @@ jobs:
       - name: Download dependencies.zip
         uses: actions/download-artifact@v4
         with:
-          name: dependencies  # Must match exactly with the upload step
+          name: dependencies-${{ github.run_number }}  # Must match exactly with the upload step
           path: artifacts
 
       # Upload to AWS S3
       - name: Upload to S3
         run: |
-          aws s3 cp artifacts/dependencies.zip s3://fastapiride/dependencies.zip
+          aws s3 cp artifacts/dependencies-${{ github.run_number }}.zip s3://fastapiride/dependencies-${{ github.run_number }}.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -117,7 +117,7 @@ jobs:
       # Deploy to AWS Lambda
       - name: Deploy to AWS Lambda
         run: |
-          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key dependencies.zip
+          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key dependencies-${{ github.run_number }}.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
