@@ -10,13 +10,13 @@ jobs:
     steps:
       # Checkout the repository
       - name: Checkout repository
-        uses: actions/checkout@v4  # Latest version
+        uses: actions/checkout@v4
 
       # Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v4  # Latest version
+        uses: actions/setup-python@v4
         with:
-          python-version: "3.10"  # Use a compatible Python version for Ubuntu 24.04
+          python-version: "3.10"
 
       # Install dependencies
       - name: Install dependencies
@@ -26,7 +26,7 @@ jobs:
 
       # Cache Virtual Environment
       - name: Cache Virtual Environment
-        uses: actions/cache@v4  # Latest version
+        uses: actions/cache@v4
         id: cache-venv
         with:
           path: .venv
@@ -53,17 +53,17 @@ jobs:
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/artifacts
           cd .venv/lib/python3.10/site-packages
-          zzip -r9 ${GITHUB_WORKSPACE}/artifacts/dependencies.zip .
+          zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies.zip .
 
       # Add API files to Zip
       - name: Add API files to Zip
         run: |
           cd ${GITHUB_WORKSPACE}
-          zip -r9 artifacts/dependencies.zip .
+          zip -r artifacts/dependencies.zip .
 
       # Upload the zip file as an artifact
       - name: Upload dependencies.zip
-        uses: actions/upload-artifact@v4  # Latest version
+        uses: actions/upload-artifact@v4
         with:
           name: dependencies
-          path: $${GITHUB_WORKSPACE}/artifacts/dependencies.zip
+          path: ${GITHUB_WORKSPACE}/artifacts/dependencies.zip
