@@ -52,7 +52,7 @@ jobs:
       # Create archive of dependency files (Fixed paths)
       - name: Archive dependencies
         run: |
-          mkdir -p ${GITHUB_WORKSPACE}/artifacts
+          mkdir -p artifacts
           cd .venv/lib/python3.9/site-packages
           
           # Debugging: Ensure files exist
@@ -60,7 +60,8 @@ jobs:
           
           # Ensure valid zip creation
           if [ "$(ls -A .)" ]; then
-            zip -r ${GITHUB_WORKSPACE}/artifacts/api.zip ./*
+            zip -r artifacts/api.zip ./*
+            echo "Artifact api.zip successfully created!"
           else
             echo "No files found, skipping zip creation."
           fi
@@ -76,7 +77,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: api  # Must match download step
-          path: ${GITHUB_WORKSPACE}/artifacts/api.zip
+          path: artifacts/api.zip
           retention-days: 5  # Prevent expiration issues
 
   CD:
