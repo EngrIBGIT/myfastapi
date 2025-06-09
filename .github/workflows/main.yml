@@ -71,13 +71,13 @@ jobs:
           cd ${GITHUB_WORKSPACE}
           zip -r artifacts/dependencies.zip .
 
-      # Upload the zip file as an artifact
+      # Upload the zip file as an artifact (Ensuring correct name match)
       - name: Upload dependencies.zip
         uses: actions/upload-artifact@v4
         with:
-          name: dependencies
+          name: dependencies  # Matches the expected artifact name
           path: ${GITHUB_WORKSPACE}/artifacts/dependencies.zip
-          retention-days: 5  # Ensure artifact remains available
+          retention-days: 5  # Prevent expiration issues
 
   CD:
     runs-on: ubuntu-latest
@@ -98,11 +98,11 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      # Download dependencies.zip artifact
+      # Download dependencies.zip artifact (Ensuring correct name match)
       - name: Download dependencies.zip
         uses: actions/download-artifact@v4
         with:
-          name: dependencies
+          name: dependencies  # Must match exactly with the upload step
           path: artifacts
 
       # Upload to AWS S3
