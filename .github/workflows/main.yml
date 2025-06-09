@@ -17,7 +17,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.9"
+          python-version: 3.9
 
       # Install dependencies
       - name: Install dependencies
@@ -49,28 +49,34 @@ jobs:
           source .venv/bin/activate
           pytest
 
-      # Create archive of dependency file
+      # Create archive of dependency files (Fixed paths)
       - name: Archive dependencies
         run: |
           mkdir -p ${GITHUB_WORKSPACE}/artifacts
           cd .venv/lib/python3.9/site-packages
           
-          # Debugging: List directory contents
+          # Debugging: Ensure files exist
           ls -lah  
           
-          # Ensure files exist before zipping
+          # Ensure valid zip creation
           if [ "$(ls -A .)" ]; then
-            zip -r ${GITHUB_WORKSPACE}/artifacts/dependencies.zip ./*
+            zip -r ${GITHUB_WORKSPACE}/artifacts/api.zip ./*
           else
-            echo "No files found in site-packages, skipping zip creation."
+            echo "No files found, skipping zip creation."
           fi
 
-      # Upload the zip file as an artifact (Ensuring correct name match)
-      - name: Upload dependencies.zip
+      # Add API files to Zip (Corrected Command)
+      - name: Add API files to Zip
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          zip -r artifacts/api.zip ./api
+
+      # Upload the zip file as an artifact (Fixed name consistency)
+      - name: Upload zip file artifact
         uses: actions/upload-artifact@v4
         with:
-          name: dependencies  # Ensure name matches exactly
-          path: ${GITHUB_WORKSPACE}/artifacts/dependencies.zip
+          name: api  # Must match download step
+          path: ${GITHUB_WORKSPACE}/artifacts/api.zip
           retention-days: 5  # Prevent expiration issues
 
   CD:
@@ -87,31 +93,32 @@ jobs:
           aws --version
 
       # Configure AWS credentials
+      - name: Set up AWS credentials
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      # Download dependencies.zip artifact (Ensuring correct name match)
-      - name: Download dependencies.zip
+      # Download zip file artifact (Fixed name match)
+      - name: Download Lambda api.zip
         uses: actions/download-artifact@v4
         with:
-          name: dependencies  # Must match exactly with the upload step
+          name: api  # Must match upload step
           path: artifacts
 
-      # Upload to AWS S3
+      # Upload to AWS S3 (Fixed file naming consistency)
       - name: Upload to S3
         run: |
-          aws s3 cp artifacts/dependencies.zip s3://fastapiride/dependencies.zip
+          aws s3 cp artifacts/api.zip s3://fastapiride/api.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      # Deploy to AWS Lambda
+      # Deploy to AWS Lambda (Fixed reference to correct zip file)
       - name: Deploy to AWS Lambda
         run: |
-          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key dependencies.zip
+          aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key api.zip
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_SECRET_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
