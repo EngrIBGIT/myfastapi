@@ -1,66 +1,67 @@
 name: FastAPI CI/CD
 on:
-  # This workflow is triggered on pushes and pull requests to the main branch
   push:
     branches:
-      # Pushes to the main branch will trigger the workflow
       - main
 
-# The Job defines a series of steps that execute on the same runner.
 jobs:
-
   CI:
-    # Define the runner used in the workflow
     runs-on: ubuntu-latest
     steps:
       # Checkout the repository
-      - uses: actions/checkout@v2
+      - name: Checkout repository
+        uses: actions/checkout@v4  # Updated to v4
 
       # Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4  # Updated to v4
         with:
-          python-version: 3.7
+          python-version: "3.7"
 
-
-      # Install Python Virtual ENVironment
-      - name: Install Python Virtual ENV
+      # Install Python Virtual Environment
+      - name: Install virtualenv
         run: pip3 install virtualenv
 
       # Setup Virtual Environment
-      # https'://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#jobsjob_idstepsrun
-      - name: Virtual ENV
-        uses: actions/checkout@v2
-        id: catch-venv
+      - name: Cache Virtual Environment
+        uses: actions/cache@v4  # Updated to v4
+        id: cache-venv
         with:
-            path: .venv
+          path: .venv
+          key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-venv-
 
-            key: ${{ runner.os }}-venv-${{ hashFiles('**/requirements.txt') }}
-            restore-keys: /
-              ${{ runner.os }}-venv-
-
-
-      # Build a virtual environment, But only if it does not already exist
+      # Build Virtual Environment (only if it does not already exist)
       - name: Activate Virtual ENV
-        run:  python venv -m venv .venv/bin/activate && pip3 install -r requirements.txt
-        if: steps.catch-venv.outputs.cache-hit != 'true'
+        run: |
+          python -m venv .venv
+          source .venv/bin/activate
+          pip install -r requirements.txt
+        if: steps.cache-venv.outputs.cache-hit != 'true'
 
-      # Run tests
+      # Run Tests
       - name: Run Tests
-        run: . venv/bin/activate && pytest
-      - name: Create archive of dependency files
-        run:  /
-           cd .venv/lib/python3.7/site-packages && \
-           zip -r9 ${GITHUB_WORKSPACE}/dependencies.zip . && \
-      - name: Add API files to Zip files
-        run:  cd ${GITHUB_WORKSPACE} && \
-           zip -r9 dependencies.zip . && \
-           mv dependencies.zip ${GITHUB_WORKSPACE}/dependencies.zip
+        run: |
+          source .venv/bin/activate
+          pytest
 
+      # Create archive of dependency files
+      - name: Archive dependencies
+        run: |
+          cd .venv/lib/python3.7/site-packages
+          zip -r9 ${GITHUB_WORKSPACE}/dependencies.zip .
+
+      # Add API files to Zip
+      - name: Add API files to Zip
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          zip -r9 dependencies.zip .
+          mv dependencies.zip ${GITHUB_WORKSPACE}/dependencies.zip
 
       # Upload the zip file as an artifact
       - name: Upload dependencies.zip
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4  # Updated to v4
         with:
           name: dependencies
           path: ${GITHUB_WORKSPACE}/dependencies.zip
