@@ -51,18 +51,19 @@ jobs:
       # Create archive of dependency files
       - name: Archive dependencies
         run: |
+          mkdir -p ${GITHUB_WORKSPACE}/artifacts
           cd .venv/lib/python3.10/site-packages
-          zip -r9 ${GITHUB_WORKSPACE}/dependencies.zip .
+          zzip -r9 ${GITHUB_WORKSPACE}/artifacts/dependencies.zip .
 
       # Add API files to Zip
       - name: Add API files to Zip
         run: |
           cd ${GITHUB_WORKSPACE}
-          zip -r9 dependencies.zip .
+          zip -r9 artifacts/dependencies.zip .
 
       # Upload the zip file as an artifact
       - name: Upload dependencies.zip
         uses: actions/upload-artifact@v4  # Latest version
         with:
           name: dependencies
-          path: ${GITHUB_WORKSPACE}/dependencies.zip
+          path: $${GITHUB_WORKSPACE}/artifacts/dependencies.zip
