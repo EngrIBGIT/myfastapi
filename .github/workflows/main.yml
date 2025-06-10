@@ -38,8 +38,8 @@ jobs:
       # Create and Activate Virtual Environment (if needed)
       - name: Setup Virtual Environment
         run: |
-          python -m venv venv
-          source venv/bin/activate
+          python -m venv .venv
+          source .venv/bin/activate
           pip install -r requirements.txt
         if: steps.cache-venv.outputs.cache-hit != 'true'
       
@@ -47,22 +47,18 @@ jobs:
         run: |
           find . -type d -name "__pycache__" -exec rm -rf {} +
 
-      # Run Tests
+      # Run Tests (specify test directory to avoid 0 tests collected)
       - name: Run Tests
         run: |
-          source venv/bin/activate
+          source .venv/bin/activate
           pytest ./test
 
       # Create archive of dependency files (Fixed paths)
       - name: Archive dependencies
         run: |
           mkdir -p artifacts
-          cd venv/lib/python3.9/site-packages
-          
-          # Debugging: Ensure files exist
+          cd .venv/lib/python3.9/site-packages
           ls -lah  
-          
-          # Ensure valid zip creation
           if [ "$(ls -A .)" ]; then
             zip -r artifacts/api.zip ./*
             echo "Artifact api.zip successfully created!"
@@ -70,19 +66,19 @@ jobs:
             echo "No files found, skipping zip creation."
           fi
 
-      # Add API files to Zip (Fixed `run:` key)
+      # Add API files to Zip
       - name: Add API files to Zip
         run: |
           cd ${GITHUB_WORKSPACE}/api
           zip -r ../artifacts/api.zip .
 
-      # Upload the zip file as an artifact (Fixed name consistency)
+      # Upload the zip file as an artifact
       - name: Upload zip file artifact
         uses: actions/upload-artifact@v4
         with:
-          name: api  # Must match download step
+          name: api
           path: artifacts/api.zip
-          retention-days: 5  # Prevent expiration issues
+          retention-days: 5
 
   CD:
     runs-on: ubuntu-latest
@@ -106,14 +102,14 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      # Download zip file artifact (Fixed name match)
+      # Download zip file artifact
       - name: Download Lambda api.zip
         uses: actions/download-artifact@v4
         with:
-          name: api  # Must match upload step
+          name: api
           path: artifacts
 
-      # Upload to AWS S3 (Fixed file naming consistency)
+      # Upload to AWS S3
       - name: Upload to S3
         run: |
           aws s3 cp artifacts/api.zip s3://fastapiride/api.zip
@@ -122,7 +118,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
 
-      # Deploy to AWS Lambda (Fixed reference to correct zip file)
+      # Deploy to AWS Lambda
       - name: Deploy to AWS Lambda
         run: |
           aws lambda update-function-code --function-name fastapi --s3-bucket fastapiride --s3-key api.zip
